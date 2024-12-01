@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags:
+  - ground
+  - Saw
+  - GoldCoin
+  - Trap
+  - Ice
+  - GobSpawner
+  - coin
+  - cp
+  - RedCowDrink
+  - Glue
+  - Wings
+  - finalCP
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - Player
+  - Traps
+  - Gobs
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Background
+    uniqueID: 2922984173
+    locked: 0
+  - name: Clouds
+    uniqueID: 3631407275
+    locked: 0
+  - name: Terrain
+    uniqueID: 1706030659
+    locked: 0
+  - name: CPs
+    uniqueID: 2104911505
+    locked: 0
+  - name: Player
+    uniqueID: 2606964119
+    locked: 0
+  - name: Professor
+    uniqueID: 511413135
+    locked: 0
