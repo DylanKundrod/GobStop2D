@@ -1,8 +1,11 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using Unity.MLAgents.Sensors;
+using Unity.MLAgents.Actuators;
+using Unity.MLAgents;
+using System.Collections;
 
-public class PlayerMovementScript : MonoBehaviour
+
+public class PlayerMovementScript : Agent
 {
     [SerializeField]
     private GameState gameState;
@@ -34,8 +37,9 @@ public class PlayerMovementScript : MonoBehaviour
     }
 
     // Start is called before the first frame update
-    void Start()
+    public override void OnEpisodeBegin()
     {
+        Debug.Log("Episode started. Resetting player state.");
         rb = GetComponent<Rigidbody2D>();
         grounded = true;
         animator = GetComponent<Animator>();
@@ -44,11 +48,12 @@ public class PlayerMovementScript : MonoBehaviour
         coll = GetComponent<Collider2D>();
     }
 
-
     IEnumerator MakeBouncy()
     {
+        Debug.Log("Bouncy effect activated!");
         coll.sharedMaterial = bouncyMaterial;
         yield return new WaitForSeconds(6);
+        Debug.Log("Bouncy effect ended.");
         coll.sharedMaterial = origMaterial;
         spriteRenderer.color = origcolor;
         gameState.isBouncy = false;
@@ -56,10 +61,12 @@ public class PlayerMovementScript : MonoBehaviour
 
     IEnumerator Glued()
     {
+        Debug.Log("Glue effect activated! Reducing speed and jump.");
         animator.speed = 0.5f;
         moveSpeed = 3.5f;
         jumpSpeed = 10f;
         yield return new WaitForSeconds(4);
+        Debug.Log("Glue effect ended. Restoring speed and jump.");
         animator.speed = 1;
         moveSpeed = 7;
         jumpSpeed = 13;
@@ -67,207 +74,173 @@ public class PlayerMovementScript : MonoBehaviour
         spriteRenderer.color = origcolor;
     }
 
-
     IEnumerator Fly()
     {
+        Debug.Log("Fly effect activated! Reducing gravity.");
         rb.gravityScale = 1;
         jumpSpeed = 10f;
         yield return new WaitForSeconds(5);
+        Debug.Log("Fly effect ended. Restoring gravity.");
         rb.gravityScale = 2;
         jumpSpeed = 13f;
         spriteRenderer.color = origcolor;
         gameState.canFly = false;
-
     }
 
-    // Update is called once per frame
-    void Update()
+    public override void OnActionReceived(ActionBuffers actions)
     {
-        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W))
-        {
-            if (grounded)
-            {
-                spaceBarDown = true;
-                grounded = false;
-            }
+        int moveDirection = actions.DiscreteActions[0];
+        bool isJumping = actions.DiscreteActions[1] == 1;
 
-            if (gameState.canFly)
-            {
-                spaceBarDown = true;
-            }
+        Debug.Log($"OnActionReceived - MoveDirection: {moveDirection}, IsJumping: {isJumping}");
+
+        switch (moveDirection)
+        {
+            case 0:
+                rb.velocity = new Vector2(-moveSpeed, rb.velocity.y);
+                Debug.Log("Moving left.");
+                break;
+            case 1:
+                rb.velocity = new Vector2(moveSpeed, rb.velocity.y);
+                Debug.Log("Moving right.");
+                AddReward(.01f);
+                break;
+            default:
+                Debug.Log("No movement.");
+                break;
         }
 
-        xDirection = Input.GetAxisRaw("Horizontal");
-
-        xIceDirection = Input.GetAxis("Horizontal");
-        
-
-        if (xDirection < 0)
+        if (isJumping && grounded)
         {
-            transform.eulerAngles = new Vector2(0, 180);
+            rb.velocity = new Vector2(rb.velocity.x, jumpSpeed);
+            Debug.Log("Jumping.");
         }
-        else
-        {
-            transform.eulerAngles = new Vector2(0, 0);
-        }
-
-        if (gameState.isBouncy)
-        {
-            spriteRenderer.color = Color.red;
-            StartCoroutine(MakeBouncy());
-        }
-
-        if (gameState.isGlued)
-        {
-            spriteRenderer.color = Color.yellow;
-            StartCoroutine(Glued());
-        }
-
-        if (gameState.canFly)
-        {
-            spriteRenderer.color = Color.cyan;
-            StartCoroutine(Fly());
-        }
-
-        SetAnimationState();
-     
-
     }
 
     private void FixedUpdate()
     {
-        rb.velocity = new Vector2(xDirection * moveSpeed, rb.velocity.y);
-        
-        if (onIce)
-        {
-            rb.velocity = new Vector2(xIceDirection* moveSpeed * 1.75f, rb.velocity.y);
-        }
-
-
-        if (spaceBarDown)
-        {
-            spaceBarDown = false;
-            rb.velocity = new Vector2(rb.velocity.x, jumpSpeed);
-        }
+        Debug.Log("FixedUpdate called. Requesting decision.");
+        RequestDecision();
     }
-
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
         GameObject go = collision.gameObject;
+        Debug.Log($"Trigger entered with: {go.tag}");
+
         collectionSoundEffect.Play();
+
         if (go.tag == "GoldCoin")
         {
+            Debug.Log("Collected a GoldCoin.");
             Destroy(go);
             gameState.coins++;
+            AddReward(1.0f);
         }
 
         if (go.tag == "RedCowDrink")
         {
+            Debug.Log("Collected RedCowDrink. Activating bouncy effect.");
             Destroy(go);
             gameState.isBouncy = true;
+            StartCoroutine(MakeBouncy());
         }
 
         if (go.tag == "Glue")
         {
+            Debug.Log("Collected Glue. Activating glue effect.");
             Destroy(go);
             gameState.isGlued = true;
+            StartCoroutine(Glued());
         }
 
         if (go.tag == "Wings")
         {
+            Debug.Log("Collected Wings. Activating fly effect.");
             Destroy(go);
-            gameState.canFly= true;
+            gameState.canFly = true;
+            StartCoroutine(Fly());
         }
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
         GameObject gobj = collision.gameObject;
+        Debug.Log($"Collision entered with: {gobj.tag}");
 
         if (gobj.tag == "ground")
         {
             grounded = true;
             onIce = false;
+            Debug.Log("Touching ground. Grounded set to true.");
         }
 
         if (gobj.tag == "Ice")
         {
-            Debug.Log("Touching ICE");
             grounded = true;
             onIce = true;
-            
+            Debug.Log("Touching Ice. Grounded set to true. Ice effect activated.");
         }
 
         if (gobj.tag == "cp")
         {
             if (gameState.coins == gameState.currentCP)
             {
+                Debug.Log("Checkpoint reached and coins match. Unlocking checkpoint.");
                 gobj.GetComponent<Collider2D>().enabled = false;
                 gameState.coins = 0;
                 gameState.currentCP++;
+                AddReward(1.0f);
             }
         }
-        /*
-        if (gobj.tag == "finalCP")
+
+        if (gobj.tag == "Trap")
         {
-            if (gameState.coins == gameState.currentCP)
-            {
-                gobj.GetComponent<Collider2D>().enabled = false;
-                gameState.coins = 0;
-                gameState.gameOver = true;
-            }
-        }*/
-       
+            Debug.Log("Touched a trap. Adding penalty.");
+            AddReward(-1.0f);
+        }
     }
 
     private void OnCollisionExit2D(Collision2D collision)
     {
+        Debug.Log($"Collision exited with: {collision.gameObject.tag}");
+
         if (collision.gameObject.tag == "ground" || collision.gameObject.tag == "Ice")
         {
             grounded = false;
-        }
-
-        if (collision.gameObject.tag == "Ice" )
-        {
-            grounded= false;
+            Debug.Log("No longer grounded.");
         }
     }
-
 
     void SetAnimationState()
     {
         AnimationStateEnum playerAnimationState;
 
-        if(grounded)
+        if (grounded)
         {
             if (xDirection == 0f)
             {
                 playerAnimationState = AnimationStateEnum.Idle;
+                Debug.Log("Player state: Idle.");
             }
             else
             {
                 playerAnimationState = AnimationStateEnum.Running;
+                Debug.Log("Player state: Running.");
             }
         }
-
-        else if (rb.velocity.y > 0f) 
+        else if (rb.velocity.y > 0f)
         {
             playerAnimationState = AnimationStateEnum.Jumping;
-
+            Debug.Log("Player state: Jumping.");
         }
-
-        else 
+        else
         {
             playerAnimationState = AnimationStateEnum.Falling;
+            Debug.Log("Player state: Falling.");
         }
 
-
-
-
         animator.SetInteger("playerState", (int)playerAnimationState);
-
-
     }
 
 }
